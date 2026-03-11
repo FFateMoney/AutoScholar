@@ -24,7 +24,7 @@ DEFAULT_OUTPUT_NAME = Path("semantic_scholar_raw_results.jsonl")
 DEFAULT_FAILURES_NAME = Path("semantic_scholar_failures.jsonl")
 DEFAULT_FIELDS = (
     "paperId,title,year,authors,url,abstract,citationCount,"
-    "influentialCitationCount,venue,externalIds"
+    "influentialCitationCount,venue,externalIds,isOpenAccess,openAccessPdf"
 )
 DEFAULT_MODE = "single_thread"
 
@@ -315,6 +315,8 @@ def normalize_paper(paper: dict, rank: int) -> dict:
         "influentialCitationCount": paper.get("influentialCitationCount"),
         "externalIds": external_ids,
         "doi": external_ids.get("DOI"),
+        "isOpenAccess": paper.get("isOpenAccess"),
+        "openAccessPdf": paper.get("openAccessPdf"),
     }
 
 
