@@ -19,6 +19,8 @@ artifacts:
   recommendation_corrections: artifacts/recommendation_corrections.jsonl
   selected_citations: artifacts/selected_citations.jsonl
   idea_assessment: artifacts/idea_assessment.json
+  evidence_map: artifacts/evidence_map.json
+  report_validation: artifacts/report_validation.json
   references_bib: artifacts/references.bib
 reports:
   prescreen: reports/prescreen.md

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 
 import typer
@@ -10,18 +12,22 @@ from autoscholar.citation.config import CitationRulesConfig, IdeaEvaluationConfi
 from autoscholar.io import read_json, read_json_list, read_json_model, read_jsonl, read_yaml
 from autoscholar.models import (
     ClaimRecord,
+    EvidenceMapRecord,
     IdeaAssessmentRecord,
     QueryRecord,
     QueryReviewRecord,
     RecommendationCorrectionRecord,
+    ReportValidationBundleRecord,
     SearchFailureRecord,
     SearchResultRecord,
     SelectedCitationRecord,
     WorkspaceManifest,
     export_json_schemas,
 )
-from autoscholar.reporting import render_report
+from autoscholar.reporting import build_evidence_map, render_report, validate_report
+from autoscholar.utils import pdf_to_text
 from autoscholar.workspace import Workspace, dump_manifest, workspace_summary
+from autoscholar.integrations import SemanticScholarClient
 
 app = typer.Typer(help="AutoScholar v2 unified CLI.")
 workspace_app = typer.Typer(help="Workspace management.")
@@ -29,16 +35,24 @@ citation_app = typer.Typer(help="Citation workflow commands.")
 idea_app = typer.Typer(help="Idea analysis workflow commands.")
 report_app = typer.Typer(help="Report rendering commands.")
 schema_app = typer.Typer(help="JSON schema export commands.")
+semantic_app = typer.Typer(help="Low-level Semantic Scholar API commands.")
+util_app = typer.Typer(help="Utility commands.")
 
 app.add_typer(workspace_app, name="workspace")
 app.add_typer(citation_app, name="citation")
 app.add_typer(idea_app, name="idea")
 app.add_typer(report_app, name="report")
 app.add_typer(schema_app, name="schema")
+app.add_typer(semantic_app, name="semantic")
+app.add_typer(util_app, name="util")
 
 
 def _load_workspace(path: Path) -> Workspace:
     return Workspace.load(path)
+
+
+def _dump_json(payload: object) -> None:
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 def _load_search_config(workspace: Workspace) -> SearchConfig:
@@ -119,6 +133,18 @@ def workspace_doctor(workspace_dir: Path = typer.Option(..., "--workspace")) -> 
     except Exception as exc:
         issues.append(str(exc))
 
+    for path, model in (
+        (workspace.require_path("artifacts", "evidence_map"), EvidenceMapRecord),
+        (workspace.require_path("artifacts", "report_validation"), ReportValidationBundleRecord),
+    ):
+        try:
+            if path.exists():
+                payload = read_json(path)
+                if payload:
+                    read_json_model(path, model)
+        except Exception as exc:
+            issues.append(str(exc))
+
     summary = workspace_summary(workspace)
     typer.echo(f"Workspace: {summary['root']}")
     typer.echo(f"Type: {summary['workspace_type']}")
@@ -173,7 +199,9 @@ def citation_bib(workspace_dir: Path = typer.Option(..., "--workspace")) -> None
 @idea_app.command("assess")
 def idea_assess(workspace_dir: Path = typer.Option(..., "--workspace")) -> None:
     workspace = _load_workspace(workspace_dir)
-    assessment = assess_idea(workspace, _load_idea_config(workspace))
+    config = _load_idea_config(workspace)
+    assessment = assess_idea(workspace, config)
+    build_evidence_map(workspace, config)
     typer.echo(f"Idea assessment complete. recommendation={assessment.recommendation}")
 
 
@@ -187,11 +215,193 @@ def report_render(
     typer.echo(f"Wrote report: {path}")
 
 
+@report_app.command("validate")
+def report_validate(
+    workspace_dir: Path = typer.Option(..., "--workspace"),
+    kind: str = typer.Option(..., "--kind", help="feasibility or deep-dive"),
+) -> None:
+    normalized_kind = "deep-dive" if kind == "deep-dive" else kind
+    if normalized_kind not in {"feasibility", "deep-dive"}:
+        raise typer.BadParameter("kind must be feasibility or deep-dive")
+    workspace = _load_workspace(workspace_dir)
+    record = validate_report(workspace, normalized_kind, _load_idea_config(workspace))
+    typer.echo(f"Report validation passed={record.passed}")
+    for issue in record.issues:
+        typer.echo(f"- {issue.level}: {issue.code}: {issue.message}")
+    if not record.passed:
+        raise typer.Exit(code=1)
+
+
 @schema_app.command("export")
 def schema_export(output_dir: Path = typer.Option(..., "--output-dir")) -> None:
     written = export_json_schemas(output_dir)
     for path in written:
         typer.echo(f"Wrote: {path}")
+
+
+@util_app.command("pdf-to-text")
+def util_pdf_to_text(
+    input_pdf: Path,
+    output_txt: Path | None = typer.Option(None, "--output"),
+) -> None:
+    output_path = pdf_to_text(input_pdf, output_txt)
+    typer.echo(f"Wrote text: {output_path}")
+
+
+@semantic_app.command("paper")
+def semantic_paper(
+    paper_id: str,
+    fields: str = typer.Option("paperId,title,authors,year,abstract", "--fields"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+) -> None:
+    with SemanticScholarClient(timeout=timeout) as client:
+        _dump_json(client.get_paper(paper_id, fields=fields, timeout=timeout))
+
+
+@semantic_app.command("search")
+def semantic_search(
+    query: str,
+    limit: int = typer.Option(5, "--limit"),
+    fields: str = typer.Option("paperId,title,year,authors,url,abstract", "--fields"),
+    endpoint: str = typer.Option("relevance", "--endpoint"),
+    year: str | None = typer.Option(None, "--year"),
+    sort: str | None = typer.Option(None, "--sort"),
+    venue: str | None = typer.Option(None, "--venue"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+) -> None:
+    with SemanticScholarClient(timeout=timeout) as client:
+        if endpoint == "bulk":
+            payload = list(
+                client.search_papers_bulk(
+                    query=query,
+                    fields=fields,
+                    max_results=limit,
+                    year=year,
+                    sort=sort,
+                    venue=venue,
+                    timeout=timeout,
+                )
+            )
+            _dump_json({"endpoint": endpoint, "query": query, "count": len(payload), "data": payload})
+            return
+        _dump_json(client.search_papers(query=query, limit=limit, fields=fields, timeout=timeout))
+
+
+@semantic_app.command("recommend")
+def semantic_recommend(
+    paper_id: str,
+    limit: int = typer.Option(5, "--limit"),
+    fields: str = typer.Option("paperId,title,year,authors,url", "--fields"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+) -> None:
+    with SemanticScholarClient(timeout=timeout) as client:
+        _dump_json(client.get_recommendations(paper_id=paper_id, limit=limit, fields=fields, timeout=timeout))
+
+
+@semantic_app.command("citations")
+def semantic_citations(
+    paper_id: str,
+    fields: str = typer.Option("paperId,title,year,authors,url", "--fields"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+) -> None:
+    with SemanticScholarClient(timeout=timeout) as client:
+        _dump_json(client.get_paper_citations(paper_id=paper_id, fields=fields, timeout=timeout))
+
+
+@semantic_app.command("references")
+def semantic_references(
+    paper_id: str,
+    fields: str = typer.Option("paperId,title,year,authors,url", "--fields"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+) -> None:
+    with SemanticScholarClient(timeout=timeout) as client:
+        _dump_json(client.get_paper_references(paper_id=paper_id, fields=fields, timeout=timeout))
+
+
+@semantic_app.command("author-search")
+def semantic_author_search(
+    query: str,
+    fields: str = typer.Option("authorId,name,url", "--fields"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+) -> None:
+    with SemanticScholarClient(timeout=timeout) as client:
+        _dump_json(client.search_author(query=query, fields=fields, timeout=timeout))
+
+
+@semantic_app.command("author")
+def semantic_author(
+    author_id: str,
+    fields: str = typer.Option("authorId,name,url,paperCount,citationCount", "--fields"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+) -> None:
+    with SemanticScholarClient(timeout=timeout) as client:
+        _dump_json(client.get_author(author_id=author_id, fields=fields, timeout=timeout))
+
+
+@semantic_app.command("author-papers")
+def semantic_author_papers(
+    author_id: str,
+    limit: int = typer.Option(20, "--limit"),
+    fields: str = typer.Option("paperId,title,year,authors,url", "--fields"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+) -> None:
+    with SemanticScholarClient(timeout=timeout) as client:
+        _dump_json(client.get_author_papers(author_id=author_id, limit=limit, fields=fields, timeout=timeout))
+
+
+@semantic_app.command("download-pdf")
+def semantic_download_pdf(
+    paper_id: str,
+    directory: Path = typer.Option(Path("papers"), "--directory"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+) -> None:
+    with SemanticScholarClient(timeout=timeout) as client:
+        output_path = client.download_open_access_pdf(paper_id=paper_id, directory=directory, timeout=timeout)
+    if output_path is None:
+        typer.echo("No open access PDF was available.")
+        raise typer.Exit(code=1)
+    typer.echo(f"Downloaded PDF: {output_path}")
+
+
+@semantic_app.command("smoke")
+def semantic_smoke(
+    query: str = typer.Option("medical image segmentation", "--query"),
+    timeout: float = typer.Option(30.0, "--timeout"),
+) -> None:
+    if not os.environ.get("S2_API_KEY"):
+        typer.echo("S2_API_KEY is not set; live smoke test skipped.")
+        return
+
+    with SemanticScholarClient(timeout=timeout) as client:
+        search_payload = client.search_papers(
+            query=query,
+            limit=1,
+            fields="paperId,title,year",
+            timeout=timeout,
+        )
+        papers = search_payload.get("data", [])
+        if not papers:
+            typer.echo("Live smoke test failed: search returned no papers.")
+            raise typer.Exit(code=1)
+        paper_id = papers[0].get("paperId")
+        if not paper_id:
+            typer.echo("Live smoke test failed: top search result had no paperId.")
+            raise typer.Exit(code=1)
+        recommendations = client.get_recommendations(
+            paper_id=paper_id,
+            limit=1,
+            fields="paperId,title,year",
+            timeout=timeout,
+        )
+
+    _dump_json(
+        {
+            "query": query,
+            "top_paper": papers[0],
+            "recommendation_count": len(recommendations),
+            "recommendations": recommendations,
+        }
+    )
 
 
 if __name__ == "__main__":

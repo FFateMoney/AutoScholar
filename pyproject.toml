@@ -40,3 +40,6 @@ autoscholar = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--basetemp=.pytest_tmp"
+markers = [
+  "live: runs real network smoke checks against Semantic Scholar when S2_API_KEY is set",
+]

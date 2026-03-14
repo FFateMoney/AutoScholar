@@ -14,7 +14,8 @@ Use this skill for AutoScholar's first analysis workflow: research idea evaluati
 3. Build claims and queries in structured artifacts.
 4. Run the citation workflow to collect evidence.
 5. Run `autoscholar idea assess`.
-6. Render feasibility and deep-dive reports.
+6. Use `report-authoring` when the task is to produce final-facing feasibility or deep-dive reports.
+7. Render and validate feasibility and deep-dive reports.
 
 ## Commands
 
@@ -27,6 +28,8 @@ autoscholar citation shortlist --workspace <dir>
 autoscholar idea assess --workspace <dir>
 autoscholar report render --workspace <dir> --kind feasibility
 autoscholar report render --workspace <dir> --kind deep-dive
+autoscholar report validate --workspace <dir> --kind feasibility
+autoscholar report validate --workspace <dir> --kind deep-dive
 ```
 
 ## Working Rules

@@ -41,6 +41,8 @@ def _default_manifest(template: Literal["citation-paper", "idea-evaluation"], re
                 "recommendation_corrections": "artifacts/recommendation_corrections.jsonl",
                 "selected_citations": "artifacts/selected_citations.jsonl",
                 "idea_assessment": "artifacts/idea_assessment.json",
+                "evidence_map": "artifacts/evidence_map.json",
+                "report_validation": "artifacts/report_validation.json",
                 "references_bib": "artifacts/references.bib",
             },
             "reports": {
@@ -152,6 +154,9 @@ def _default_idea_evaluation_config() -> dict:
         "top_evidence_per_claim": 2,
         "ready_threshold": 0.7,
         "revision_threshold": 0.45,
+        "report_top_papers_per_claim": 3,
+        "report_reference_limit": 12,
+        "report_claim_summary_limit": 3,
     }
 
 
@@ -222,6 +227,8 @@ class Workspace:
         for json_path in (
             self.path("artifacts", "query_reviews"),
             self.path("artifacts", "idea_assessment"),
+            self.path("artifacts", "evidence_map"),
+            self.path("artifacts", "report_validation"),
         ):
             if json_path is not None and not json_path.exists():
                 write_text(json_path, "{}\n")

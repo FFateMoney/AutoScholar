@@ -217,10 +217,16 @@ def test_idea_assess_and_render(tmp_path: Path) -> None:
         "artifacts/search_failures.jsonl",
         "artifacts/recommendation_corrections.jsonl",
         "artifacts/selected_citations.jsonl",
+        "artifacts/evidence_map.json",
+        "artifacts/report_validation.json",
     ):
         destination = workspace_dir / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text((source_example / relative).read_text(encoding="utf-8"), encoding="utf-8")
+        source_path = source_example / relative
+        if source_path.exists():
+            destination.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
+        else:
+            destination.write_text("{}\n" if relative.endswith(".json") else "", encoding="utf-8")
 
     assess = runner.invoke(app, ["idea", "assess", "--workspace", str(workspace_dir)])
     assert assess.exit_code == 0, assess.stdout
@@ -231,8 +237,22 @@ def test_idea_assess_and_render(tmp_path: Path) -> None:
     render_deep_dive = runner.invoke(
         app, ["report", "render", "--workspace", str(workspace_dir), "--kind", "deep-dive"]
     )
+    validate_feasibility = runner.invoke(
+        app, ["report", "validate", "--workspace", str(workspace_dir), "--kind", "feasibility"]
+    )
+    validate_deep_dive = runner.invoke(
+        app, ["report", "validate", "--workspace", str(workspace_dir), "--kind", "deep-dive"]
+    )
 
     assert render_feasibility.exit_code == 0, render_feasibility.stdout
     assert render_deep_dive.exit_code == 0, render_deep_dive.stdout
+    assert validate_feasibility.exit_code == 0, validate_feasibility.stdout
+    assert validate_deep_dive.exit_code == 0, validate_deep_dive.stdout
     feasibility_text = (workspace_dir / "reports" / "feasibility.md").read_text(encoding="utf-8")
+    deep_dive_text = (workspace_dir / "reports" / "deep_dive.md").read_text(encoding="utf-8")
     assert "OpenPQFormer Idea" in feasibility_text
+    assert "## 1. 评估结论" in feasibility_text
+    assert "## 1. 一页结论" in deep_dive_text
+    assert "MOOD 2020" in deep_dive_text
+    evidence_map_text = (workspace_dir / "artifacts" / "evidence_map.json").read_text(encoding="utf-8")
+    assert "executive_summary" in evidence_map_text

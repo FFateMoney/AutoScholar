@@ -133,3 +133,6 @@ class IdeaEvaluationConfig(BaseModel):
     top_evidence_per_claim: int = 2
     ready_threshold: float = 0.7
     revision_threshold: float = 0.45
+    report_top_papers_per_claim: int = 3
+    report_reference_limit: int = 12
+    report_claim_summary_limit: int = 3

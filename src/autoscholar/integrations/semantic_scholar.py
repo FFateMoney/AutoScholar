@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Generator, Sequence
 
 import httpx
@@ -235,3 +236,88 @@ class SemanticScholarClient:
             timeout=timeout,
         )
         return payload.get("data", [])
+
+    def download_open_access_pdf(
+        self,
+        paper_id: str,
+        directory: str | Path = "papers",
+        user_agent: str = "AutoScholar/2.0",
+        timeout: float | None = None,
+    ) -> Path | None:
+        paper = self.get_paper(
+            paper_id,
+            fields="paperId,isOpenAccess,openAccessPdf",
+            timeout=timeout,
+        )
+
+        if not paper.get("isOpenAccess") or not paper.get("openAccessPdf"):
+            return None
+
+        pdf_url = (paper.get("openAccessPdf") or {}).get("url")
+        if not pdf_url:
+            return None
+
+        target_dir = Path(directory).resolve()
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path = target_dir / f"{paper_id}.pdf"
+        if target_path.exists():
+            return target_path
+
+        headers = {"user-agent": user_agent}
+        with self.client.stream("GET", pdf_url, headers=headers, timeout=timeout) as response:
+            response.raise_for_status()
+            content_type = (response.headers.get("content-type") or "").lower()
+            if "pdf" not in content_type:
+                return None
+            with target_path.open("wb") as handle:
+                for chunk in response.iter_bytes():
+                    handle.write(chunk)
+        return target_path
+
+    def _get_citation_edges(
+        self,
+        base_url: str,
+        fields: str = "title,authors",
+        timeout: float | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
+        page_size = 1000
+        offset = 0
+        while True:
+            payload = self._request(
+                "GET",
+                base_url,
+                params={"fields": fields, "limit": page_size, "offset": offset},
+                timeout=timeout,
+            )
+            data = payload.get("data", [])
+            for item in data:
+                yield item
+            if len(data) < page_size:
+                return
+            offset += page_size
+
+    def get_paper_citations(
+        self,
+        paper_id: str,
+        fields: str = "title,authors",
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
+        edges = self._get_citation_edges(
+            f"{self.BASE_URL}/paper/{paper_id}/citations",
+            fields=fields,
+            timeout=timeout,
+        )
+        return [edge["citingPaper"] for edge in edges if "citingPaper" in edge]
+
+    def get_paper_references(
+        self,
+        paper_id: str,
+        fields: str = "title,authors",
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
+        edges = self._get_citation_edges(
+            f"{self.BASE_URL}/paper/{paper_id}/references",
+            fields=fields,
+            timeout=timeout,
+        )
+        return [edge["citedPaper"] for edge in edges if "citedPaper" in edge]

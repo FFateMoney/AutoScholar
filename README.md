@@ -46,6 +46,8 @@ autoscholar citation shortlist --workspace D:\workspaces\idea-demo
 autoscholar idea assess --workspace D:\workspaces\idea-demo
 autoscholar report render --workspace D:\workspaces\idea-demo --kind feasibility
 autoscholar report render --workspace D:\workspaces\idea-demo --kind deep-dive
+autoscholar report validate --workspace D:\workspaces\idea-demo --kind feasibility
+autoscholar report validate --workspace D:\workspaces\idea-demo --kind deep-dive
 ```
 
 ## Workspace Model
@@ -62,12 +64,13 @@ The manifest is the single source of truth for logical paths. AutoScholar no lon
 
 ## Skills
 
-AutoScholar ships with four skills:
+AutoScholar ships with five skills:
 
 - `.agents/skills/autoscholar`
 - `.agents/skills/citation-workflow`
 - `.agents/skills/idea-evaluation`
 - `.agents/skills/semantic-scholar-api`
+- `.agents/skills/report-authoring`
 
 The top-level `autoscholar` skill explains capability routing. The workflow skills explain how to combine commands and structured artifacts. The API skill is for low-level Semantic Scholar operations and debugging.
 
@@ -100,7 +103,21 @@ Primary commands:
 - `autoscholar citation bib`
 - `autoscholar idea assess`
 - `autoscholar report render`
+- `autoscholar report validate`
 - `autoscholar schema export`
+- `autoscholar semantic ...`
+- `autoscholar util pdf-to-text`
+
+Low-level and utility examples:
+
+```powershell
+autoscholar semantic paper CorpusID:123
+autoscholar semantic citations CorpusID:123
+autoscholar semantic references CorpusID:123
+autoscholar semantic download-pdf CorpusID:123 --directory D:\papers
+autoscholar semantic smoke
+autoscholar util pdf-to-text D:\papers\sample.pdf
+```
 
 ## Example
 

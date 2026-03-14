@@ -26,11 +26,30 @@ It supports:
 - relevance search
 - bulk search
 - recommendations
+- citations
+- references
 - author search
 - author papers
+- open-access PDF download
+
+## CLI Surface
+
+Use the `autoscholar semantic` command group for direct inspection and debugging:
+
+- `autoscholar semantic paper <paper_id>`
+- `autoscholar semantic search <query>`
+- `autoscholar semantic recommend <paper_id>`
+- `autoscholar semantic citations <paper_id>`
+- `autoscholar semantic references <paper_id>`
+- `autoscholar semantic author-search <query>`
+- `autoscholar semantic author <author_id>`
+- `autoscholar semantic author-papers <author_id>`
+- `autoscholar semantic download-pdf <paper_id>`
+- `autoscholar semantic smoke`
 
 ## Notes
 
 - The client reads `S2_API_KEY` when present.
 - Without an API key, expect lower rate limits.
 - Prefer explicit `fields` to keep responses small.
+- `autoscholar semantic smoke` skips cleanly when `S2_API_KEY` is unset.

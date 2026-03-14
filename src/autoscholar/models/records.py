@@ -179,6 +179,63 @@ class EvidenceSummary(BaseModel):
     top_papers: list[str] = Field(default_factory=list)
 
 
+class EvidencePaperRecord(BaseModel):
+    paper_id: str | None = None
+    title: str
+    year: int | None = None
+    venue: str | None = None
+    citation_count: int | None = None
+    doi: str | None = None
+    url: str | None = None
+    support_tier: Literal["direct", "adjacent", "context"]
+    support_reason: str
+
+
+class EvidenceClaimRecord(BaseModel):
+    claim_id: str
+    short_label: str | None = None
+    claim_text: str
+    claim_type: str
+    priority: str
+    status: Literal["ready", "review", "weak"]
+    evidence_strength: Literal["strong", "mixed", "weak"]
+    narrative: str
+    notes: list[str] = Field(default_factory=list)
+    top_papers: list[EvidencePaperRecord] = Field(default_factory=list)
+
+
+class EvidenceMapRecord(BaseModel):
+    idea_id: str
+    title: str
+    language: Literal["zh", "en"]
+    recommendation: Literal["recommended", "needs-revision", "not-ready"]
+    executive_summary: str
+    strongest_claim_ids: list[str] = Field(default_factory=list)
+    weakest_claim_ids: list[str] = Field(default_factory=list)
+    claims: list[EvidenceClaimRecord] = Field(default_factory=list)
+    reference_papers: list[EvidencePaperRecord] = Field(default_factory=list)
+    generated_at: str
+
+
+class ReportValidationIssueRecord(BaseModel):
+    level: Literal["error", "warning"]
+    code: str
+    message: str
+
+
+class ReportValidationRecord(BaseModel):
+    kind: Literal["feasibility", "deep-dive"]
+    report_path: str
+    passed: bool
+    issues: list[ReportValidationIssueRecord] = Field(default_factory=list)
+    checked_at: str
+
+
+class ReportValidationBundleRecord(BaseModel):
+    feasibility: ReportValidationRecord | None = None
+    deep_dive: ReportValidationRecord | None = None
+
+
 class IdeaAssessmentRecord(BaseModel):
     idea_id: str
     title: str
@@ -213,6 +270,8 @@ class WorkspaceArtifacts(BaseModel):
     recommendation_corrections: str
     selected_citations: str
     idea_assessment: str
+    evidence_map: str | None = None
+    report_validation: str | None = None
     references_bib: str | None = None
 
 
@@ -243,6 +302,8 @@ def export_json_schemas(output_dir: Path) -> list[Path]:
         "query_review_record": QueryReviewRecord,
         "selected_citation_record": SelectedCitationRecord,
         "idea_assessment_record": IdeaAssessmentRecord,
+        "evidence_map_record": EvidenceMapRecord,
+        "report_validation_bundle_record": ReportValidationBundleRecord,
         "recommendation_correction_record": RecommendationCorrectionRecord,
     }
     written: list[Path] = []

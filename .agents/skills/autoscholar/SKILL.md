@@ -19,6 +19,7 @@ Use this skill as the entry point for the repository.
 
 - For claim-first literature support and bibliography work, use `citation-workflow`.
 - For evaluating a research direction or idea from evidence, use `idea-evaluation`.
+- For evidence-grounded long-form feasibility or deep-dive reports, use `report-authoring`.
 - For low-level Semantic Scholar lookups or debugging, use `semantic-scholar-api`.
 
 ## Operating Model
@@ -33,6 +34,8 @@ Use this skill as the entry point for the repository.
 ```powershell
 autoscholar workspace init D:\workspaces\demo --template citation-paper --reports-lang zh
 autoscholar workspace doctor --workspace D:\workspaces\demo
+autoscholar semantic paper CorpusID:123
+autoscholar util pdf-to-text D:\papers\sample.pdf
 ```
 
 ## References

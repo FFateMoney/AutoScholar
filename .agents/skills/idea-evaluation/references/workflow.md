@@ -9,8 +9,10 @@
 ## Outputs
 
 - `artifacts/idea_assessment.json`
+- `artifacts/evidence_map.json`
 - `reports/feasibility.md`
 - `reports/deep_dive.md`
+- `artifacts/report_validation.json`
 
 ## Assessment Shape
 
@@ -26,3 +28,4 @@ The assessment record contains:
 - `next_actions`
 
 Use the rendered reports as drafts for further model-guided refinement.
+Validate final-facing reports with `autoscholar report validate`.

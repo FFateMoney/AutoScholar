@@ -6,8 +6,10 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from autoscholar.io import read_json, read_json_list, read_json_model, read_jsonl, write_text
-from autoscholar.models import ClaimRecord, IdeaAssessmentRecord, QueryReviewRecord, SearchResultRecord, SelectedCitationRecord
+from autoscholar.citation.config import IdeaEvaluationConfig
+from autoscholar.io import read_json_list, read_jsonl, read_yaml, write_text
+from autoscholar.models import ClaimRecord, QueryReviewRecord, SelectedCitationRecord
+from autoscholar.reporting.authoring import build_deep_dive_context, build_feasibility_context
 from autoscholar.workspace import Workspace
 
 
@@ -82,17 +84,17 @@ def render_report(workspace: Workspace, kind: str) -> Path:
             },
         )
     elif kind == "feasibility":
-        assessment = read_json_model(workspace.require_path("artifacts", "idea_assessment"), IdeaAssessmentRecord)
-        records = read_jsonl(workspace.require_path("artifacts", "selected_citations"), SelectedCitationRecord)
+        config = IdeaEvaluationConfig.model_validate(read_yaml(workspace.require_path("configs", "idea_evaluation")))
+        context = build_feasibility_context(workspace, config)
         output_path = workspace.require_path("reports", "feasibility")
         template = env.get_template("report_feasibility.md.j2")
-        content = template.render(language=language, labels=labels, assessment=assessment, records=records)
+        content = template.render(language=language, labels=labels, **context)
     elif kind == "deep-dive":
-        assessment = read_json_model(workspace.require_path("artifacts", "idea_assessment"), IdeaAssessmentRecord)
-        records = read_jsonl(workspace.require_path("artifacts", "selected_citations"), SelectedCitationRecord)
+        config = IdeaEvaluationConfig.model_validate(read_yaml(workspace.require_path("configs", "idea_evaluation")))
+        context = build_deep_dive_context(workspace, config)
         output_path = workspace.require_path("reports", "deep_dive")
         template = env.get_template("report_deep_dive.md.j2")
-        content = template.render(language=language, labels=labels, assessment=assessment, records=records)
+        content = template.render(language=language, labels=labels, **context)
     else:
         raise ValueError(f"Unsupported report kind: {kind}")
 
