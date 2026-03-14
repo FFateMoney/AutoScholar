@@ -1,0 +1,3 @@
+top_evidence_per_claim: 2
+ready_threshold: 0.7
+revision_threshold: 0.45

@@ -1,20 +1,20 @@
-*.txt
-
-# Python cache
 __pycache__/
 *.pyc
+.pytest_cache/
+.pytest_tmp/
+.mypy_cache/
+*.pyo
+*.pyd
+*.egg-info/
 
-# TeX build artifacts
-*.log
-*.aux
-*.bbl
-*.blg
-*.out
-*.bcf
-*.run.xml
-*.synctex.gz
-*.toc
+.venv/
+build/
+dist/
 
-# Current paper workspace
+.workspaces/
+
+# Legacy local workspaces kept outside v2 structure.
 paper/
 old_paper/
+idea_eval/
+scripts/run_workspace_claim_review.py

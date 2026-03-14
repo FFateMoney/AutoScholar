@@ -1,0 +1,31 @@
+# Deep Dive
+
+## Idea Summary
+
+- Idea: {{ assessment.title }}
+- Recommendation: `{{ assessment.recommendation }}`
+- Overall score: {{ assessment.scores.overall }}
+
+{{ assessment.summary }}
+
+## Claim-Level Evidence
+
+{% for record in records %}
+### {{ record.claim.claim_id }}
+
+- Status: {{ record.status }}
+- Claim: {{ record.claim.claim_text }}
+{% if record.note %}
+- Note: {{ record.note }}
+{% endif %}
+
+{% if record.selected_papers %}
+{% for paper in record.selected_papers %}
+- {{ paper.rank }}. {{ paper.paper.title }} ({{ paper.paper.year or "n/a" }})
+  cite_count={{ paper.paper.citation_count or 0 }}, support_score={{ "%.2f"|format(paper.score_breakdown.support_signal) }}, final_score={{ "%.2f"|format(paper.score_breakdown.final_score) }}
+{% endfor %}
+{% else %}
+- No selected papers yet.
+{% endif %}
+
+{% endfor %}

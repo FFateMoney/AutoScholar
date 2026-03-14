@@ -1,0 +1,35 @@
+# Feasibility Report
+
+## Overview
+
+- Idea: {{ assessment.title }}
+- Recommendation: `{{ assessment.recommendation }}`
+- Generated at: {{ assessment.generated_at }}
+
+{{ assessment.summary }}
+
+## Scorecard
+
+- Literature support: {{ assessment.scores.literature_support }}
+- Evidence quality: {{ assessment.scores.evidence_quality }}
+- Implementation feasibility: {{ assessment.scores.implementation_feasibility }}
+- Novelty risk: {{ assessment.scores.novelty_risk }}
+- Overall: {{ assessment.scores.overall }}
+
+## Risks
+
+{% for risk in assessment.risks %}
+- {{ risk }}
+{% endfor %}
+
+## Evidence Snapshot
+
+{% for item in assessment.evidence %}
+- {{ item.claim_id }}: status={{ item.status }}, selected_paper_count={{ item.selected_paper_count }}, top_papers={{ item.top_papers|join("; ") }}
+{% endfor %}
+
+## Next Actions
+
+{% for action in assessment.next_actions %}
+- {{ action }}
+{% endfor %}
