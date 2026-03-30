@@ -1,192 +1,124 @@
 # AutoScholar
 
-AutoScholar is a tool-oriented repository for adding citations to academic paper drafts.
+AutoScholar v2 is a structured scholarly workflow toolkit built for agent-driven research support.
 
-It is built around a claim-first workflow:
+It is designed as:
 
-1. extract citation-worthy claims from a draft
-2. prepare search queries
-3. batch-search Semantic Scholar
-4. deduplicate and prescreen results
-5. run agent-guided recommendation expansion when needed
-6. generate claim-level recommendation lists
-7. generate a clean BibTeX file
-8. insert citations back into the manuscript
+- an installable Python package
+- a unified `autoscholar` CLI
+- a skill-oriented repository for LLM agents
+- a workspace-based system that keeps task data outside the core repo by default
 
-
-## What This Repo Contains
-
-### Core search capability
-
-- [SemanticScholarApi/api.py](/d:/pythonProject/AutoScholar/SemanticScholarApi/api.py)
-- [.agents/skills/semantic_scholar_api/SKILL.md](/d:/pythonProject/AutoScholar/.agents/skills/semantic_scholar_api/SKILL.md)
-
-### Reusable scripts
-
-- [batch_semantic_scholar_search.py](/d:/pythonProject/AutoScholar/scripts/batch_semantic_scholar_search.py)
-  Batch Semantic Scholar search runner driven by YAML.
-- [dedupe_and_prescreen_semantic_scholar.py](/d:/pythonProject/AutoScholar/scripts/dedupe_and_prescreen_semantic_scholar.py)
-  Deduplicates raw query results and generates a prescreen report.
-- [generate_claim_recommendation_list.py](/d:/pythonProject/AutoScholar/scripts/generate_claim_recommendation_list.py)
-  Builds claim-level citation recommendations from prescreened search results.
-- [recommendation_auto_correct.py](/d:/pythonProject/AutoScholar/scripts/recommendation_auto_correct.py)
-  Agent-guided recommendation expansion step for weak or mixed retrieval claims.
-- [generate_references_bib.py](/d:/pythonProject/AutoScholar/scripts/generate_references_bib.py)
-  Generates a manuscript-ready `references.bib`.
-
-### Reusable configuration
-
-- [claim_recommendation_rules.yaml](/d:/pythonProject/AutoScholar/config/claim_recommendation_rules.yaml)
-  Query exclusions, paper exclusions, and claim notes for recommendation generation.
-- [recommendation_auto_correct.yaml](/d:/pythonProject/AutoScholar/config/recommendation_auto_correct.yaml)
-  Trigger thresholds and recommendation expansion settings.
-
-### Workflow documentation
-
-- [PAPER_WORKFLOW.md](/d:/pythonProject/AutoScholar/PAPER_WORKFLOW.md)
-  Full end-to-end workflow and reuse pattern.
-
-
-## Repository Philosophy
-
-This repository is intended to be a tool repository, not a paper-content repository.
-
-That means:
-
-- scripts and workflow documents should be versioned
-- per-paper working files should stay outside the core repo history
-- temporary or paper-specific artifacts should be ignored
-
-The current [\.gitignore](/d:/pythonProject/AutoScholar/.gitignore) ignores the whole `paper/` workspace.
-
-
-## Minimal Usage Pattern
-
-Prepare a paper workspace locally, then run the pipeline in order.
-
-### 1. Search
+## Install
 
 ```powershell
-python scripts\batch_semantic_scholar_search.py
+python -m pip install -e .[test]
 ```
 
-Canonical `paper/semantic_scholar_search.yaml` structure:
+## Quick Start
 
-```yaml
-paths:
-  input: search_keyword_prep.md
-  output: semantic_scholar_raw_results.jsonl
-  failures: semantic_scholar_failures.jsonl
-
-run:
-  claim_ids: []
-  dry_run: false
-
-search:
-  endpoint: relevance
-  limit: 10
-  timeout: 30
-  fields: paperId,title,year,authors,url,abstract,citationCount,influentialCitationCount,venue,externalIds,isOpenAccess,openAccessPdf
-  filters:
-    sort:
-    publication_types: []
-    open_access_pdf:
-    min_citation_count:
-    publication_date_or_year:
-    year:
-    venue:
-    fields_of_study: []
-
-execution:
-  mode: single_thread
-  single_thread:
-    workers: 1
-    max_retries: 30
-    retry_delay: 1.0
-    pause_seconds: 1.0
-  multi_thread:
-    workers: 8
-    max_retries: 30
-    retry_delay: 1.0
-    pause_seconds: 0.0
-```
-
-The script still accepts older flat keys for backward compatibility, but the grouped structure above is now the intended single-file layout.
-
-### 2. Deduplicate and prescreen
+Initialize a workspace:
 
 ```powershell
-python scripts\dedupe_and_prescreen_semantic_scholar.py
+autoscholar workspace init D:\workspaces\demo --template citation-paper --reports-lang zh
 ```
 
-### 3. Expand with Recommendations when retrieval is weak or mixed
-
-This step is now treated as part of the main review workflow rather than a disconnected add-on.
-
-The intended operating pattern is:
-
-- the agent reviews prescreened search results claim by claim
-- the agent selects trustworthy seed papers and excludes obviously irrelevant papers first
-- the agent runs `recommendation_auto_correct.py`
-- the agent decides whether another recommendation round is warranted or whether the underlying query should be rewritten instead
-
-Dry run:
+Run the citation workflow:
 
 ```powershell
-python scripts\recommendation_auto_correct.py --dry-run
+autoscholar citation search --workspace D:\workspaces\demo
+autoscholar citation prescreen --workspace D:\workspaces\demo
+autoscholar citation correct --workspace D:\workspaces\demo
+autoscholar citation shortlist --workspace D:\workspaces\demo
+autoscholar citation bib --workspace D:\workspaces\demo
+autoscholar report render --workspace D:\workspaces\demo --kind prescreen
+autoscholar report render --workspace D:\workspaces\demo --kind shortlist
 ```
 
-Live run:
+Run the idea-evaluation workflow:
 
 ```powershell
-python scripts\recommendation_auto_correct.py
+autoscholar workspace init D:\workspaces\idea-demo --template idea-evaluation --reports-lang zh
+autoscholar citation search --workspace D:\workspaces\idea-demo
+autoscholar citation prescreen --workspace D:\workspaces\idea-demo
+autoscholar citation correct --workspace D:\workspaces\idea-demo
+autoscholar citation shortlist --workspace D:\workspaces\idea-demo
+autoscholar idea assess --workspace D:\workspaces\idea-demo
+autoscholar report render --workspace D:\workspaces\idea-demo --kind feasibility
+autoscholar report render --workspace D:\workspaces\idea-demo --kind deep-dive
+autoscholar report validate --workspace D:\workspaces\idea-demo --kind feasibility
+autoscholar report validate --workspace D:\workspaces\idea-demo --kind deep-dive
 ```
 
-### 4. Build claim recommendations
+## Workspace Model
+
+Every workspace is explicit and self-contained. `autoscholar workspace init` creates:
+
+- `workspace.yaml`
+- `inputs/`
+- `configs/`
+- `artifacts/`
+- `reports/`
+
+The manifest is the single source of truth for logical paths. AutoScholar no longer depends on repo-local `paper/`, `idea_eval/`, or `old_paper/` directories.
+
+## Skills
+
+AutoScholar ships with five skills:
+
+- `.agents/skills/autoscholar`
+- `.agents/skills/citation-workflow`
+- `.agents/skills/idea-evaluation`
+- `.agents/skills/semantic-scholar-api`
+- `.agents/skills/report-authoring`
+
+The top-level `autoscholar` skill explains capability routing. The workflow skills explain how to combine commands and structured artifacts. The API skill is for low-level Semantic Scholar operations and debugging.
+
+## Structured Artifacts
+
+Standard machine-readable artifacts include:
+
+- `artifacts/claims.jsonl`
+- `artifacts/queries.jsonl`
+- `artifacts/search_results.raw.jsonl`
+- `artifacts/search_results.deduped.jsonl`
+- `artifacts/query_reviews.json`
+- `artifacts/recommendation_corrections.jsonl`
+- `artifacts/selected_citations.jsonl`
+- `artifacts/idea_assessment.json`
+- `artifacts/references.bib`
+
+Markdown files in `reports/` are rendered from these structured artifacts and are not treated as the source of truth.
+
+## CLI Surface
+
+Primary commands:
+
+- `autoscholar workspace init`
+- `autoscholar workspace doctor`
+- `autoscholar citation search`
+- `autoscholar citation prescreen`
+- `autoscholar citation correct`
+- `autoscholar citation shortlist`
+- `autoscholar citation bib`
+- `autoscholar idea assess`
+- `autoscholar report render`
+- `autoscholar report validate`
+- `autoscholar schema export`
+- `autoscholar semantic ...`
+- `autoscholar util pdf-to-text`
+
+Low-level and utility examples:
 
 ```powershell
-python scripts\generate_claim_recommendation_list.py
+autoscholar semantic paper CorpusID:123
+autoscholar semantic citations CorpusID:123
+autoscholar semantic references CorpusID:123
+autoscholar semantic download-pdf CorpusID:123 --directory D:\papers
+autoscholar semantic smoke
+autoscholar util pdf-to-text D:\papers\sample.pdf
 ```
 
-You can also pass a different rules file:
+## Example
 
-```powershell
-python scripts\generate_claim_recommendation_list.py config\claim_recommendation_rules.yaml
-```
-
-### 5. Generate BibTeX
-
-```powershell
-python scripts\generate_references_bib.py
-```
-
-
-## Expected Workspace Layout
-
-The current scripts assume a per-paper working directory named `paper/` with files such as:
-
-- `paper/paper.tex`
-- `paper/citation_claim_units.md`
-- `paper/search_keyword_prep.md`
-- `paper/semantic_scholar_search.yaml`
-- `paper/semantic_scholar_raw_results.jsonl`
-
-These files are intentionally treated as working artifacts rather than core repository assets.
-
-
-## Notes
-
-- No local LaTeX environment is required for the search and recommendation pipeline.
-- The Semantic Scholar workflow can run without an API key, but rate limiting should be expected.
-- Recommendation expansion should be agent-reviewed before each live run; seed choice is part of the workflow, not a blind automation step.
-- Recommendation expansion can be run multiple times for the same claim set until the evidence pool stabilizes or the agent decides the query set must be rewritten.
-- Recommendation output should always be reviewed before citation insertion.
-- Search aggregators are discovery tools, not formal publication venues; generated `.bib` files should not preserve Semantic Scholar URLs as final citation metadata.
-
-
-## Next Improvements
-
-- make all script input/output paths configurable rather than implicitly tied to `paper/`
-- add a dedicated citation-insertion audit script
-- add richer BibTeX field completion beyond `author/title/year/journal/doi`
-- provide a clean starter template for a new paper workspace
+A small tracked example workspace lives under [`examples/idea-evaluation-demo`](/d:/pythonProject/AutoScholar/examples/idea-evaluation-demo).
