@@ -399,10 +399,20 @@ def build_deep_dive_context(workspace: Workspace, config: IdeaEvaluationConfig) 
             "risk_responses": risk_responses,
         }
 
-        return {
-            "assessment": assessment,
-            "evidence_map": evidence_map,
-            "one_page_conclusion": [evidence_map.executive_summary],
+    fallback_actions = assessment.next_actions or ["Keep narrowing the scope and strengthening evidence."]
+    risk_source = assessment.risks or ["No additional structural risk was detected beyond the current evidence gaps."]
+    risk_responses = [
+        {
+            "risk": risk,
+            "response": fallback_actions[min(index, len(fallback_actions) - 1)],
+        }
+        for index, risk in enumerate(risk_source)
+    ]
+
+    return {
+        "assessment": assessment,
+        "evidence_map": evidence_map,
+        "one_page_conclusion": [evidence_map.executive_summary],
         "framing_definition": [
             "Anchor the paper around the strongest claims first.",
             "Separate direct support from adjacent support explicitly.",
@@ -426,16 +436,8 @@ def build_deep_dive_context(workspace: Workspace, config: IdeaEvaluationConfig) 
             "Avoid claiming a mature direct literature line when support is still mixed.",
             "Avoid presenting all adjacent work as exact same-task prior art.",
         ],
-            "risk_responses": [
-                {
-                    "risk": risk,
-                    "response": (assessment.next_actions or ["Keep narrowing the scope and strengthening evidence."])[
-                        min(index, len((assessment.next_actions or ["Keep narrowing the scope and strengthening evidence."])) - 1)
-                    ],
-                }
-                for index, risk in enumerate(assessment.risks)
-            ],
-        }
+        "risk_responses": risk_responses,
+    }
 
 
 def _required_headings(kind: str, language: str) -> list[str]:
